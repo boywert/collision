@@ -14,8 +14,6 @@
 #define UnitVelocity_in_cm_per_s 100000.0 // km/s
 #define MAX(x, y) (((x) > (y)) ? (x) : (y))
 #define MIN(x, y) (((x) < (y)) ? (x) : (y))
-#define RIGHTBOUND(x,y) (((x) < (y)) ? (x) : (0))
-//#define RIGHTBOUND(x,y) (MIN(x,y))
 #define third 0.3333333333333333333333333333333333333333333333333333333333333
 #define cube(x) (x*x*x)
 inline  double simpson_third(int i) {
@@ -27,9 +25,6 @@ double calculate_T(double u, double y) {
     return crosssection*32*M_PI*pow(2.0*u,lambda);
   else
     return crosssection*32*M_PI*pow(2.0*u,lambda)*sin(u*y)/(u*y);
-}
-double maxwell_dist_3D(double vx, double vy, double vz, double beta) {
-  return exp(-0.5*(vx*vx+vy*vy+vz*vz)/(beta*beta))/(sqrt(2.0*pi*beta*beta));
 }
 double Krook_Wu_dist_1D(double v, double K, double beta) {
   return 0.5*exp(-0.5*v*v/(K*beta*beta))/(sqrt(2.0*pi*K*beta*beta))*((3.*K-1.)/K + (1.-K)*v*v/(K*K*beta*beta));
@@ -93,20 +88,17 @@ int main()  {
   double fft_coeff = 1./(8.*M_PI*M_PI*M_PI);
   double V[3] = {0.0, 0.0, 0.0};
   double t = 0.0;
-  double rho = rho_Msun_per_pc3*1.989e33/((3.1e18)*(3.1e18)*(3.1e18)); //g/cm^3
-  double tau = 1./(4*M_PI*rho*C_lambda*UnitVelocity_in_cm_per_s);
-  double t_max = tau*12.0;
-  double dt = tau*0.01;
+  double dt = 10*Myr;
+  double t_max = 10000*Myr;
   double *simpson_third_w;
-
-  printf("tau = %g Myr\n",tau/Myr);
-  printf("Myr = %g, dt = %g\n, t = %g",Myr,dt/Myr,t);
+  double rho = rho_Msun_per_pc3*1.989e33/((3.1e18)*(3.1e18)*(3.1e18)); //g/cm^3
+  printf("Myr = %g, dt = %g\n",Myr,dt);
   int *Cn_grid;
   Cn_grid = malloc(sizeof(int)*(n));
-  simpson_third_w = malloc(sizeof(double)*(n));
+  simpson_third_w = malloc(sizeof(double)*n);
   for (int i = 0; i < n; i++) {
     Cn_grid[i] = -n/2+i;
-    simpson_third_w[i] = simpson_third(i);
+    simpson_third_w[i] = 1.0;//simpson_third(i);
   }
   double **Cv_grid;
   double **Cu_grid;
@@ -125,13 +117,9 @@ int main()  {
       Cy_grid[i][j] = Cn_grid[j]*h_y;
     }
   }
-  for (int j = 0; j < n; j++) {		
-    printf("%g %g %g\n",Cv_grid[0][j],Cv_grid[1][j],Cv_grid[2][j]);
-  }
-
   double *dist_fn; //3D velocity distribution function.
   dist_fn = fftw_malloc(sizeof(double)*(n)*(n)*(n));
-  double sum = 0.0, sum_vx =0.0, sum_vy = 0.0,sum_vz = 0.0;
+  double sum = 0.0;
   for (int i = 0; i < n; i++) {
     double w_i,w_j,w_k;
     w_i = simpson_third_w[i];
@@ -140,18 +128,11 @@ int main()  {
       for (int k = 0; k < n; k++) {
 	w_k = simpson_third_w[k];
 	dist_fn[i*(n)*(n) + j*(n) + k] =
-	  //maxwell_dist_3D(Cv_grid[0][i]-V[0],Cv_grid[1][j]-V[1],Cv_grid[2][k]-V[2], sigma);
 	  Krook_Wu_dist_3D(Cv_grid[0][i]-V[0],Cv_grid[1][j]-V[1],Cv_grid[2][k]-V[2],this_K, sigma);
 	sum += dist_fn[i*(n)*(n) + j*(n) + k]*h_v3*w_i*w_j*w_k;
-	sum_vx += dist_fn[i*(n)*(n) + j*(n) + k]*Cu_grid[0][i]*h_v3*w_i*w_j*w_k;
-	sum_vy += dist_fn[i*(n)*(n) + j*(n) + k]*Cu_grid[1][j]*h_v3*w_i*w_j*w_k;
-	sum_vz += dist_fn[i*(n)*(n) + j*(n) + k]*Cu_grid[2][k]*h_v3*w_i*w_j*w_k;
-	// printf("Vx = %g, Vy = %g, Vz = %g\n",sum_vx/sum,sum_vy/sum,sum_vz/sum);
       }
     }
   }
-  /* printf("Vx = %g, Vy = %g, Vz = %g\n",sum_vx/sum,sum_vy/sum,sum_vz/sum); */
-  /* exit(1); */
   double check_sum = 0.0;
   printf("sum = %g\n",sum);
   for (int i =0; i < n; i++) {
@@ -164,14 +145,6 @@ int main()  {
 	dist_fn[i*(n)*(n) + j*(n) + k] *= rho/sum;
 	check_sum += dist_fn[i*(n)*(n) + j*(n) + k]*h_v3*w_i*w_j*w_k;
       }
-    }
-  }
-  for (int iii = n/2; iii < n/2+1; iii++) {
-    for (int jjj = n/2; jjj < n/2+1; jjj++) {
-      for (int kkk = 0; kkk < n; kkk++) {
-	printf("%g\t", creal(dist_fn[iii*(n)*(n) + jjj*(n) + kkk]));
-      }
-      printf("\n");
     }
   }
   printf("check sum = %g\n", check_sum);
@@ -188,87 +161,62 @@ int main()  {
     // for each u_k in C_u
 
 
-    for (int i = 0; i < n; i++) {
-      double wi = 1.0;
-      //if((i==0) || (i==n)) wi = 0.5;
-      for (int j = 0; j < n; j++) {
-	double wj = 1.0;
-	//if((j==0) || (j==n)) wj = 0.5;
-	for (int k = 0; k < n; k++) {
-	  double wk = 1.0;
-	  //if((k==0) || (k==n)) wk = 0.5;
-	  double abs_u = sqrt(Cu_grid[0][i%n]*Cu_grid[0][i%n]+Cu_grid[1][j%n]*Cu_grid[1][j%n]+Cu_grid[2][k%n]*Cu_grid[2][k%n]);
-	  fftw_complex *g1;
-	  g1 = fftw_malloc(sizeof(_Complex double)*(n)*(n)*(n));
-	  fftw_complex *g2;
-	  g2 = fftw_malloc(sizeof(_Complex double)*(n)*(n)*(n));
-	  fftw_plan plan = fftw_plan_dft_3d(n, n, n, g1, g2, FFTW_FORWARD,FFTW_ESTIMATE);
-	  for (int ii = 0; ii < n; ii++) {
-	    for (int jj = 0; jj < n; jj++) {
-	      for (int kk = 0; kk < n; kk++) {
-		int index_i = RIGHTBOUND(MAX(Cn_grid[ii]-Cn_grid[i%n]+n/2,0),n-1);
-		int index_j = RIGHTBOUND(MAX(Cn_grid[jj]-Cn_grid[j%n]+n/2,0),n-1);
-		int index_k = RIGHTBOUND(MAX(Cn_grid[kk]-Cn_grid[k%n]+n/2,0),n-1);
-		//printf("%d %d %d\n",index_i,index_j,index_k);
-		g1[ii*(n)*(n) + jj*(n) + kk] = dist_fn[index_i*(n)*(n) + index_j*(n) + index_k];
-		index_i = RIGHTBOUND(MAX(Cn_grid[ii]+Cn_grid[i%n]+n/2,0),n-1);
-		index_j = RIGHTBOUND(MAX(Cn_grid[jj]+Cn_grid[j%n]+n/2,0),n-1);
-		index_k = RIGHTBOUND(MAX(Cn_grid[kk]+Cn_grid[k%n]+n/2,0),n-1);
-		g1[ii*(n)*(n) + jj*(n) + kk] *= dist_fn[index_i*(n)*(n) + index_j*(n) + index_k]*simpson_third_w[ii]*simpson_third_w[jj]*simpson_third_w[kk];
-	      }
+    for (int m = 0; m <= 3*n*n/4; m++) {
+      if(m%8 != 7) {
+	double abs_u = sqrt(Cu_grid[0][i]*Cu_grid[0][i]+Cu_grid[1][j]*Cu_grid[1][j]+Cu_grid[2][k]*Cu_grid[2][k]);
+	fftw_complex *g1;
+	g1 = fftw_malloc(sizeof(_Complex double)*(n)*(n)*(n));
+	fftw_complex *g2;
+	g2 = fftw_malloc(sizeof(_Complex double)*(n)*(n)*(n));
+	fftw_plan plan = fftw_plan_dft_3d(n, n, n, g1, g2, FFTW_FORWARD,FFTW_ESTIMATE);
+	for (int ii = 0; ii < n; ii++) {
+	  for (int jj = 0; jj < n; jj++) {
+	    for (int kk = 0; kk < n; kk++) {
+	      int index_i = MIN(MAX(Cn_grid[ii]-Cn_grid[i]+n/2,0),n-1);
+	      int index_j = MIN(MAX(Cn_grid[jj]-Cn_grid[j]+n/2,0),n-1);
+	      int index_k = MIN(MAX(Cn_grid[kk]-Cn_grid[k]+n/2,0),n-1);
+	      g1[ii*(n)*(n) + jj*(n) + kk] = dist_fn[index_i*(n)*(n) + index_j*(n) + index_k];
+	      index_i = MIN(MAX(Cn_grid[ii]+Cn_grid[i]+n/2,0),n-1);
+	      index_j = MIN(MAX(Cn_grid[jj]+Cn_grid[j]+n/2,0),n-1);
+	      index_k = MIN(MAX(Cn_grid[kk]+Cn_grid[k]+n/2,0),n-1);
+	      g1[ii*(n)*(n) + jj*(n) + kk] *= dist_fn[index_i*(n)*(n) + index_j*(n) + index_k]*simpson_third_w[ii]*simpson_third_w[jj]*simpson_third_w[kk];
 	    }
 	  }
-
-	  // perform forward (-1) FFTW
-	  complex_fftshift(g1,n);
-	  /* for (int iii = n/2; iii < n/2+1; iii++) { */
-	  /*   for (int jjj = n/2; jjj < n/2+1; jjj++) { */
-	  /*     for (int kkk = 0; kkk < n; kkk++) { */
-	  /* 	printf("%g\t", creal(g1[iii*(n)*(n) + jjj*(n) + kkk])); */
-	  /*     } */
-	  /*     printf("\n"); */
-	  /*   } */
-	  /* } */
-	  /* printf("\n"); */
-	  
-	  fftw_execute(plan);
-	 
-	  //printf("fraction  = %g\n",(double)tt/(n*n*n));
-	  
-	  complex_fftshift(g2,n);
-	  /* for (int iii = n/2; iii < n/2+1; iii++) { */
-	  /*   for (int jjj = n/2; jjj < n/2+1; jjj++) { */
-	  /*     for (int kkk = 0; kkk < n; kkk++) { */
-	  /* 	printf("%g\t", g2[iii*(n)*(n) + jjj*(n) + kkk]); */
-	  /*     } */
-	  /*     printf("\n"); */
-	  /*   } */
-	  /* } */
-	  /* exit(0); */
-	  /* printf("\n"); */
-
-	  fftw_free(g1);
-	  
-	  // for all element in C_y
-	  for (int ii = 0; ii < n; ii++) {
-	    for (int jj = 0; jj < n; jj++) {
-	      for (int kk = 0; kk < n; kk++) {
-		double theta = Cy_grid[0][ii]*V[0] + Cy_grid[1][jj]*V[1] + Cy_grid[2][kk]*V[2];
-		_Complex double itheta = cos(theta) + I*sin(theta);
-		double abs_y = sqrt(Cy_grid[0][ii]*Cy_grid[0][ii]+Cy_grid[1][jj]*Cy_grid[1][jj]+Cy_grid[2][kk]*Cy_grid[2][kk]);
-		double T = calculate_T(abs_u,abs_y);
-		// use g3 to collect each value for u_k
-		g3[ii*(n)*(n) + jj*(n) + kk] += wi*wj*wk*fft_coeff*h_v3*h_v3*g2[ii*(n)*(n) + jj*(n) + kk]*itheta*T;//*simpson_third_w[i]*simpson_third_w[j]*simpson_third_w[k];
-
-	      }
-	    }
-
-	  }
-	  fftw_destroy_plan(plan);		
-	  fftw_free(g2);	
 	}
+
+	// perform forward (-1) FFTW
+	complex_fftshift(g1,n);
+	  
+	fftw_execute(plan);
+	 
+	//printf("fraction  = %g\n",(double)tt/(n*n*n));
+	  
+	complex_fftshift(g2,n);
+       
+
+	fftw_free(g1);
+	  
+	// for all element in C_y
+	for (int ii = 0; ii < n; ii++) {
+	  for (int jj = 0; jj < n; jj++) {
+	    for (int kk = 0; kk < n; kk++) {
+	      double theta = Cy_grid[0][ii]*V[0] + Cy_grid[1][jj]*V[1] + Cy_grid[2][kk]*V[2];
+	      _Complex double itheta = cos(theta) + I*sin(theta);
+	      double abs_y = sqrt(Cy_grid[0][ii]*Cy_grid[0][ii]+Cy_grid[1][jj]*Cy_grid[1][jj]+Cy_grid[2][kk]*Cy_grid[2][kk]);
+	      double T = calculate_T(abs_u,abs_y);
+	      // use g3 to collect each value for u_k
+	      g3[ii*(n)*(n) + jj*(n) + kk] += fft_coeff*h_v3*h_v3*g2[ii*(n)*(n) + jj*(n) + kk]*itheta*T;//*simpson_third_w[i]*simpson_third_w[j]*simpson_third_w[k];
+
+	    }
+	  }
+
+	}
+	fftw_destroy_plan(plan);		
+	fftw_free(g2);
       }
     }
+      
+    
     
 
     complex_fftshift(g3,n);
@@ -282,15 +230,12 @@ int main()  {
     
 	  double theta = Cu_grid[0][i]*V[0] + Cu_grid[1][j]*V[1] + Cu_grid[2][k]*V[2];
 	  _Complex double itheta = cos(theta) + I*sin(theta);
-	  
+	  //	  if(creal(Q[i*(n)*(n) + j*(n) + k]) < 0)
+	  //  printf ("Q < 0; %g\n",creal(Q[i*(n)*(n) + j*(n) + k]));
 	  Q[i*(n)*(n) + j*(n) + k] *= itheta*h_y3;
-	  //if(creal(Q[i*(n)*(n) + j*(n) + k]) < 0)
-	    // printf ("Q < 0; %g\n",creal(Q[i*(n)*(n) + j*(n) + k])*dt/dist_fn[i*(n)*(n) + j*(n) + k]);
-	  //printf ("%g\t",creal(Q[i*(n)*(n) + j*(n) + k]));
+	  
 	}
-	//printf("\n");
-      }
-      //printf("\n");
+      }	
     }
 
     double *g;
@@ -303,10 +248,10 @@ int main()  {
 	    for (int jj = 0; jj < n; jj++) {
 	      for (int kk = 0; kk < n; kk++) {
 		g[i*(n)*(n) + j*(n) + k] +=
-		  //simpson_third_w[ii]*simpson_third_w[jj]*simpson_third_w[kk]
-		  dist_fn[ii*(n)*(n) + jj*(n) + kk]
+		  simpson_third_w[ii]*simpson_third_w[jj]*simpson_third_w[kk]
+		  *dist_fn[ii*(n)*(n) + jj*(n) + kk]
 		  *calculate_B(h_v*sqrt((double)((ii - i)*(ii - i)
-						 + (jj - j)*(jj - j)
+						  + (jj - j)*(jj - j)
 						  + (kk - k)*(kk - k))));
 	      }
 	    }
@@ -324,7 +269,7 @@ int main()  {
     temp_dist_fn3 = fftw_malloc(sizeof(_Complex double)*n*n*n);
     fftw_plan plan3 = fftw_plan_dft_3d(n, n, n, temp_dist_fn1, temp_dist_fn2, FFTW_BACKWARD,FFTW_ESTIMATE);
     fftw_plan plan4 = fftw_plan_dft_3d(n, n, n, temp_dist_fn2, temp_dist_fn3, FFTW_FORWARD,FFTW_ESTIMATE);
-    //double max_t = 10*Myr;
+    double max_t = 10*Myr;
 
     double check_Q = 0.0;
     for (int i = 0; i < n; i++) {
@@ -340,16 +285,16 @@ int main()  {
 	}
       }
     }
-    //dt = max_t;
+    dt = max_t;
     printf("dt = %g Myr\t check_Q = %g Q+ = %g Q- = %g\n",dt/Myr,check_Q,sum_Qp,sum_Qm);
     for (int i = 0; i < n; i++) {
       for (int j = 0; j < n; j++) {
 	for (int k = 0; k < n; k++) {
 	  temp_dist_fn1[i*(n)*(n) + j*(n) + k] = (dist_fn[i*(n)*(n) + j*(n) + k] + creal(Q[i*(n)*(n) + j*(n) + k])*dt);//*simpson_third_w[i]*simpson_third_w[j]*simpson_third_w[k];
-	  if (creal(temp_dist_fn1[i*(n)*(n) + j*(n) + k]) < 0) {
-	    printf("Stop: distribution function < 0; dist = %g Q = %g, new_dist = %g pos = (%d,%d,%d)\n", dist_fn[i*(n)*(n) + j*(n) + k],dt*creal(Q[i*(n)*(n) + j*(n) + k]),creal(temp_dist_fn1[i*(n)*(n) + j*(n) + k]),i,j,k);
-	    //exit(0);
-	  }
+	  /* if (creal(temp_dist_fn1[i*(n)*(n) + j*(n) + k]) < 0) { */
+	  /*   printf("Stop: distribution function < 0; dist = %g Q = %g, new_dist = %g pos = (%d,%d,%d)\n", dist_fn[i*(n)*(n) + j*(n) + k],creal(Q[i*(n)*(n) + j*(n) + k]),creal(temp_dist_fn1[i*(n)*(n) + j*(n) + k]),i,j,k); */
+	  /*   exit(0); */
+	  /* } */
 	}
       }
     }
@@ -365,7 +310,7 @@ int main()  {
     // Conservation correction
     complex_fftshift(temp_dist_fn1,n);
     fftw_execute(plan3);
-    fftw_destroy_plan(plan3);
+    //fftw_destroy_plan(plan3);
     // origin
     printf("old = %g, new = %g\n",creal(temp_dist_fn2[0]), rho/h_v3);
     temp_dist_fn2[0] = rho/h_v3;
@@ -385,7 +330,7 @@ int main()  {
 
     fftw_execute(plan4);
     fftw_destroy_plan(plan4);
-    
+
     for (int i = 0; i < n; i++) {
       for (int j = 0; j < n; j++) {
 	for (int k = 0; k < n; k++) {
