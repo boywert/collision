@@ -75,7 +75,7 @@ void complex_fftshift(_Complex double *a, int n) {
 }
 
 int main()  {
-  int n = 16;
+  int n = 8;
   double L = 800.0;
   L *=  UnitVelocity_in_cm_per_s;
   double sigma = 187.0;

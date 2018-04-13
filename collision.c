@@ -6,7 +6,9 @@
 #include <fftw3.h>
 
 #define lambda 0.0
-#define C_lambda (187.0/M_PI/4.0) //cm^2/g km/s
+//#define lambda 1.0
+#define C_lambda (18700000.0/M_PI/4.0) //cm^2/g cm/s
+//#define C_lambda (1.0/M_PI/4.0) //cm^2/g 
 #define rho_Msun_per_pc3 0.02   
 #define this_K 0.6
 #define pi M_PI
@@ -22,7 +24,7 @@ inline  double simpson_third(int i) {
   return third*((i%2)*2.0+2.0);
 }
 double calculate_T(double u, double y) {
-  double crosssection = C_lambda* UnitVelocity_in_cm_per_s; // cm^3/g/sec
+  double crosssection = C_lambda;
   if (u*y == 0)
     return crosssection*32*M_PI*pow(2.0*u,lambda);
   else
@@ -38,7 +40,7 @@ double Krook_Wu_dist_3D(double vx, double vy, double vz, double K, double beta) 
   return 0.5*exp(-0.5*(vx*vx+vy*vy+vz*vz)/(K*beta*beta))/((2.0*pi*K*beta*beta)*sqrt(2.0*pi*K*beta*beta))*((5.*K-3.)/K + (1.-K)*(vx*vx+vy*vy+vz*vz)/(K*K*beta*beta));
 }
 double calculate_B(double u) {
-  double crosssection = C_lambda* UnitVelocity_in_cm_per_s; // cm^3/g/sec
+  double crosssection = C_lambda;
   return 4.*M_PI*crosssection*pow(u,lambda);
 }
 void real_fftshift(double *a, int n) {
@@ -80,9 +82,11 @@ void complex_fftshift(_Complex double *a, int n) {
 }
 
 int main()  {
-  int n = 16;
-  double L = 800.0;
-  L *=  UnitVelocity_in_cm_per_s;
+  int n = 24;
+  double R0 = 800.0;
+  R0 *= UnitVelocity_in_cm_per_s;
+  double L = R0*2.5;
+  double R = R0*2.0;
   double sigma = 187.0;
   sigma *=  UnitVelocity_in_cm_per_s;
   double h_v = 2.*L/n;
@@ -92,11 +96,12 @@ int main()  {
   double normal_coeff = 1./(2*M_PI*sigma*sigma*sqrt(2*M_PI*sigma*sigma));
   double fft_coeff = 1./(8.*M_PI*M_PI*M_PI);
   double V[3] = {0.0, 0.0, 0.0};
-  double t = 0.0;
+  
   double rho = rho_Msun_per_pc3*1.989e33/((3.1e18)*(3.1e18)*(3.1e18)); //g/cm^3
   double tau = 1./(4*M_PI*rho*C_lambda*UnitVelocity_in_cm_per_s);
-  double t_max = tau*12.0;
-  double dt = tau*0.01;
+  double t = 0;//6.0*log(2.5)*tau;
+  double t_max = 15000*Myr;
+  double dt = 10*Myr;
   double *simpson_third_w;
 
   printf("tau = %g Myr\n",tau/Myr);
@@ -141,7 +146,13 @@ int main()  {
 	w_k = simpson_third_w[k];
 	dist_fn[i*(n)*(n) + j*(n) + k] =
 	  //maxwell_dist_3D(Cv_grid[0][i]-V[0],Cv_grid[1][j]-V[1],Cv_grid[2][k]-V[2], sigma);
-	  Krook_Wu_dist_3D(Cv_grid[0][i]-V[0],Cv_grid[1][j]-V[1],Cv_grid[2][k]-V[2],this_K, sigma);
+	  rho*Krook_Wu_dist_3D(Cv_grid[0][i]-V[0],Cv_grid[1][j]-V[1],Cv_grid[2][k]-V[2],this_K, sigma);
+	/* if (fabs(Cv_grid[0][i]-V[0]) > R0 ) */
+	/*   dist_fn[i*(n)*(n) + j*(n) + k] = 0.0; */
+	/* if (fabs(Cv_grid[1][j]-V[1]) > R0 ) */
+	/*   dist_fn[i*(n)*(n) + j*(n) + k] = 0.0; */
+	/* if (fabs(Cv_grid[2][k]-V[2]) > R0 ) */
+	/*   dist_fn[i*(n)*(n) + j*(n) + k] = 0.0; */
 	sum += dist_fn[i*(n)*(n) + j*(n) + k]*h_v3*w_i*w_j*w_k;
 	sum_vx += dist_fn[i*(n)*(n) + j*(n) + k]*Cu_grid[0][i]*h_v3*w_i*w_j*w_k;
 	sum_vy += dist_fn[i*(n)*(n) + j*(n) + k]*Cu_grid[1][j]*h_v3*w_i*w_j*w_k;
@@ -152,26 +163,24 @@ int main()  {
   }
   /* printf("Vx = %g, Vy = %g, Vz = %g\n",sum_vx/sum,sum_vy/sum,sum_vz/sum); */
   /* exit(1); */
-  double check_sum = 0.0;
-  printf("sum = %g\n",sum);
-  for (int i =0; i < n; i++) {
-    double w_i,w_j,w_k;
-    w_i = simpson_third_w[i];
-    for (int j = 0; j < n; j++) {
-      w_j = simpson_third_w[j];
-      for (int k = 0; k < n; k++) {
-	w_k = simpson_third_w[k];
-	dist_fn[i*(n)*(n) + j*(n) + k] *= rho/sum;
-	check_sum += dist_fn[i*(n)*(n) + j*(n) + k]*h_v3*w_i*w_j*w_k;
-      }
-    }
-  }
 
-  printf("check sum = %g\n", check_sum);
+  
   // Set up g3 for each y in C_y
   FILE *fp_time, *fp_x;
   fp_time = fopen("time.out","w");
   fp_x = fopen("vx.out","w");
+  for (int i = 0; i < n; i++) {
+    double gg = 0.0;
+    double gc = 0.0;
+    for (int j = 0; j < n; j++) {
+      for (int k = 0; k < n; k++) {
+	gg += dist_fn[i*(n)*(n) + j*(n) + k]*h_v*h_v;
+      }
+    }
+    printf("%g\t",gg);
+  }
+  printf("\n");
+  fflush(fp_x);
   while(t < t_max) {
     fftw_complex *g3;
     g3 = fftw_malloc(sizeof(fftw_complex)*(n)*(n)*(n));
@@ -181,9 +190,34 @@ int main()  {
     for(int i = 0; i < (n)*(n)*(n); i++) {
       g3[i] = 0.0;
     }
+    /* // adjust dist_fn */
+    /* double sum = 0.0; */
+    /* double sum2 = 0.0; */
+    /* for (int i =0; i < n; i++) { */
+    /*   for (int j = 0; j < n; j++) { */
+    /* 	for (int k = 0; k < n; k++) { */
+    /* 	  sum += dist_fn[i*(n)*(n) + j*(n) + k]*h_v3; */
+    /* 	  if (fabs(Cv_grid[0][i]-V[0]) > R0 ) */
+    /* 	    dist_fn[i*(n)*(n) + j*(n) + k] = 0.0; */
+    /* 	  if (fabs(Cv_grid[1][j]-V[1]) > R0 ) */
+    /* 	    dist_fn[i*(n)*(n) + j*(n) + k] = 0.0; */
+    /* 	  if (fabs(Cv_grid[2][k]-V[2]) > R0 ) */
+    /* 	    dist_fn[i*(n)*(n) + j*(n) + k] = 0.0; */
+    /* 	  sum2 += dist_fn[i*(n)*(n) + j*(n) + k]*h_v3; */
+    /* 	} */
+    /*   } */
+    /* } */
+    /* printf("sum = %g, sum2 = %g\n",sum,sum2); */
+    /* for (int i =0; i < n; i++) { */
+    /*   for (int j = 0; j < n; j++) { */
+    /* 	for (int k = 0; k < n; k++) { */
+
+    /* 	  dist_fn[i*(n)*(n) + j*(n) + k]*=sum/sum2; */
+    /* 	} */
+    /*   } */
+    /* } */
+
     // for each u_k in C_u
-
-
     for (int i = 0; i < n; i++) {
       for (int j = 0; j < n; j++) {
 	for (int k = 0; k < n; k++) {
@@ -302,6 +336,12 @@ int main()  {
 	  sum_Qp += creal(Q[i*(n)*(n) + j*(n) + k])*h_v3;
 	  sum_Qm += g[i*(n)*(n) + j*(n) + k]*h_v3;
 	  Q[i*(n)*(n) + j*(n) + k] -= g[i*(n)*(n) + j*(n) + k];
+	  if (fabs(Cv_grid[0][i]-V[0]) > R )
+    	    Q[i*(n)*(n) + j*(n) + k] = 0.0;
+    	  if (fabs(Cv_grid[1][j]-V[1]) > R )
+    	    Q[i*(n)*(n) + j*(n) + k] = 0.0;
+    	  if (fabs(Cv_grid[2][k]-V[2]) > R )
+    	    Q[i*(n)*(n) + j*(n) + k] = 0.0;	  
 	  //temp_dist_fn1[i*(n)*(n) + j*(n) + k] = (dist_fn[i*(n)*(n) + j*(n) + k] + creal(Q[i*(n)*(n) + j*(n) + k])*dt);//*simpson_third_w[i]*simpson_third_w[j]*simpson_third_w[k];
 	  check_Q += Q[i*(n)*(n) + j*(n) + k]*h_v3;
 	  //max_t = MIN(max_t,(0.1*dist_fn[i*(n)*(n) + j*(n) + k]/fabs(creal(Q[i*(n)*(n) + j*(n) + k]))));
@@ -315,10 +355,10 @@ int main()  {
       for (int j = 0; j < n; j++) {
 	for (int k = 0; k < n; k++) {
 	  temp_dist_fn1[i*(n)*(n) + j*(n) + k] = (dist_fn[i*(n)*(n) + j*(n) + k] + creal(Q[i*(n)*(n) + j*(n) + k])*dt);//*simpson_third_w[i]*simpson_third_w[j]*simpson_third_w[k];
-	  if (creal(temp_dist_fn1[i*(n)*(n) + j*(n) + k]) < 0) {
-	    printf("Stop: distribution function < 0; dist = %g Q = %g, new_dist = %g pos = (%d,%d,%d)\n", dist_fn[i*(n)*(n) + j*(n) + k],dt*creal(Q[i*(n)*(n) + j*(n) + k]),creal(temp_dist_fn1[i*(n)*(n) + j*(n) + k]),i,j,k);
+	  //if (creal(temp_dist_fn1[i*(n)*(n) + j*(n) + k]) < 0) {
+	  // printf("Stop: distribution function < 0; dist = %g Q = %g, new_dist = %g pos = (%d,%d,%d)\n", dist_fn[i*(n)*(n) + j*(n) + k],dt*creal(Q[i*(n)*(n) + j*(n) + k]),creal(temp_dist_fn1[i*(n)*(n) + j*(n) + k]),i,j,k);
 	    //exit(0);
-	  }
+	  // }
 	}
       }
     }
@@ -379,7 +419,7 @@ int main()  {
     fftw_free(Q);
     fftw_free(g3);
     free(g);
-    fprintf(fp_time,"%g\n",t/tau);
+    fprintf(fp_time,"%g\n",t/Myr);
     for (int i = 0; i < n; i++) {
       double gg = 0.0;
       double gc = 0.0;
