@@ -145,7 +145,7 @@ int main() {
   for(int i = 0; i < Np; i++) { 
     x[i] = i*(xmax-xmin)/(Np-1) + xmin; 
     f[i] = KrookWu_f_speed(x[i],0.6,sigma/sqrt(3.0));
-    printf("%g\t",f[i]);
+    //printf("%g\t",f[i]);
   }
   printf("\n");
   double *vel;
