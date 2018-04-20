@@ -231,6 +231,7 @@ int main() {
     for(int k=0; k<Nhist; k++)
       printf("%g\t",(float)int_hist[k]/N);
     printf("\n");
+    fflush();
   }
   
   return(0);
