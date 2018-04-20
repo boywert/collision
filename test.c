@@ -147,7 +147,7 @@ int main() {
     f[i] = KrookWu_f_speed(x[i],0.6,sigma/sqrt(3.0));
     //printf("%g\t",f[i]);
   }
-  printf("\n");
+  //printf("\n");
   double *vel;
   vel = init_vel(N, Np, f, x, xmin, xmax);
   int Nhist = 16;
@@ -164,7 +164,7 @@ int main() {
     }
   }
   for(int k=0; k<Nhist; k++)
-    printf("%ld\t",int_hist[k]);
+    printf("%g\t",(float)int_hist[k]/N);
   printf("\n");
   gsl_rng *rng = gsl_rng_alloc(gsl_rng_taus2);
   gsl_rng_set(rng, time(NULL)); // Seed with time
