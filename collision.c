@@ -83,7 +83,7 @@ void complex_fftshift(_Complex double *a, int n) {
 
 int main()  {
   int n = 24;
-  double R0 = 800.0;
+  double R0 = 600.0;
   R0 *= UnitVelocity_in_cm_per_s;
   double L = R0*2.5;
   double R = R0*2.0;
@@ -430,8 +430,10 @@ int main()  {
 	}
       }
       fprintf(fp_x,"%g\t",gg);
+      printf("%g\t",gg);
     }
     fprintf(fp_x,"\n");
+    printf("\n");
     fflush(fp_x);
     fflush(fp_time);
   }
