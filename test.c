@@ -129,17 +129,17 @@ double KrookWu_f_speed(double v, double K, double beta) {
 int main() {
   int N = 2*32*32*32;
   int Np = 10000;
-  double sigma = 187.0; //km/s
+  double sigma = 187.0*1e5; //km/s
   double xmin = 0.0;
   double xmax = sigma*10;
-  double cspm = 1.0*sigma*1e5;
+  double cspm = 1.0*sigma;
   double rho_Msun_per_pc3 = 0.02;
   double rho = rho_Msun_per_pc3*1.989e33/((3.1e18)*(3.1e18)*(3.1e18)); //g/cm^3
   double Mp = rho/N;
   double kappa = cspm/4.0/M_PI;
   double *x, *f;
   double tau = 1/(rho*4.0*M_PI*kappa);
-  double dt = 0.01*tau;
+  double dt = 0.1*tau;
   x = (double *)malloc(sizeof(double)*Np);
   f = (double *)malloc(sizeof(double)*Np);
   for(int i = 0; i < Np; i++) { 
@@ -152,8 +152,8 @@ int main() {
   vel = init_vel(N, Np, f, x, xmin, xmax);
   int Nhist = 16;
   long int_hist[16] = {0};
-  double vmin = -400.0;
-  double vmax = 400.0;
+  double vmin = -400.0*1e5;
+  double vmax = 400.0*1e5;
   double dv = (vmax-vmin)/Nhist;
   for(int i=0; i<N; i++) {
     //printf("vx = %g\n",vel[3*i]);
@@ -164,7 +164,7 @@ int main() {
     }
   }
   for(int k=0; k<Nhist; k++)
-    printf("%g\t",(float)int_hist[k]/N);
+    printf("%g\t",(float)int_hist[k]/N/dv);
   printf("\n");
   gsl_rng *rng = gsl_rng_alloc(gsl_rng_taus2);
   gsl_rng_set(rng, time(NULL)); // Seed with time
@@ -217,8 +217,8 @@ int main() {
     printf("t = %g\n",t/tau);
     int Nhist = 16;
     long int_hist[16] = {0};
-    double vmin = -400.0;
-    double vmax = 400.0;
+    double vmin = -400.0*1e5;
+    double vmax = 400.0*1e5;
     double dv = (vmax-vmin)/Nhist;
     for(int i=0; i<N; i++) {
       //printf("vx = %g\n",vel[3*i]);
@@ -229,7 +229,7 @@ int main() {
       }
     }
     for(int k=0; k<Nhist; k++)
-      printf("%g\t",(float)int_hist[k]/N);
+      printf("%g\t",(float)int_hist[k]/N/dv);
     printf("\n");
     fflush(stdout);
   }
