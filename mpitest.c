@@ -125,12 +125,11 @@ double *init_vel(int N, int Np, double *rf, double *rx, double xmin, double xmax
   return vel;
 }
 
-void write_histogram(FILE *fp, double *vel, int N, double time) {
+void write_histogram(FILE *fp, double *vel, double vmin, double vmax, int N, double time) {
   long int_hist[Nhist];
   for(int i=0; i < Nhist; i++)
     int_hist[i] = 0;
-  double vmin = -400.0*1e5;
-  double vmax = 400.0*1e5;
+
   double dv = (vmax-vmin)/Nhist;
   for(int i=0; i<N; i++) {
     if((vel[3*i] > vmin ) && (vel[3*i] < vmax)) {
@@ -175,6 +174,8 @@ int main(int argc, char** argv) {
   double sigma = 187.0*1e5; //cm/s
   double xmin = 0.0;
   double xmax = sigma*10;
+  double vmin = -400.0*1e5;
+  double vmax = 400.0*1e5;
   double cspm = 1.0*sigma;
   double rho_Msun_per_pc3 = 0.02;
   double rho = rho_Msun_per_pc3*1.989e33/((3.1e18)*(3.1e18)*(3.1e18)); //g/cm^3
@@ -211,7 +212,7 @@ int main(int argc, char** argv) {
   if(MPI_rank == 0) {
     fp_out = fopen (fp_out_name,"w");
     fprintf(fp_out, "%d\t%g\t%d\t%g\n",N, tau, Nhist, t);
-    write_histogram(fp_out, vel, N, t/tau);
+    write_histogram(fp_out, vel, vmin, vmax, N, t/tau);
   }
   while (t < 12*tau) {
     //randomize (s_index, N);
@@ -255,7 +256,7 @@ int main(int argc, char** argv) {
     }
     t+=dt;
     if(MPI_rank == 0)
-      write_histogram(fp_out, vel, N, t/tau);
+      write_histogram(fp_out, vel, vmin, vmax, N, t/tau);
  
 
   }
