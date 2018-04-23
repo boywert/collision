@@ -165,8 +165,8 @@ int main(int argc, char** argv) {
   char Time[23],fp_out_name[256];
   time(&p_t);
   tm = localtime(&p_t);
-  strftime(Time, sizeof Time, "%Y:%m:%d-%I:%M:%S", tm);
-  sprintf(fp_out_name,"output_%s",Time);
+  strftime(Time, sizeof Time, "%Y%m%d_%I%M%S", tm);
+  sprintf(fp_out_name,"output_%d_%s",N,Time);
 
   int Np = 10000;
   double sigma = 187.0*1e5; //cm/s
