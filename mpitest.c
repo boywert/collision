@@ -124,6 +124,7 @@ double *init_vel(int N, int Np, double *rf, double *rx, double xmin, double xmax
 
   return vel;
 }
+
 void write_histogram(FILE *fp, double *vel, int N, double time) {
   long int_hist[Nhist];
   for(int i=0; i < Nhist; i++)
@@ -157,8 +158,10 @@ int main(int argc, char** argv) {
   // Get the rank of the process
   int MPI_rank;
   MPI_Comm_rank(MPI_COMM_WORLD, &MPI_rank);
-
-  int N = 32;
+  int N;
+  sscanf(argv[1],"%d",&N);
+  if(MPI_rank == 0)
+    printf("DSMC N = %dx%dx%d = %d\n",N,N,N,N*N*N);
   N = N*N*N;
   time_t p_t;
   struct tm* tm;
@@ -207,7 +210,7 @@ int main(int argc, char** argv) {
   FILE *fp_out;
   if(MPI_rank == 0) {
     fp_out = fopen (fp_out_name,"w");
-    fprintf(fp_out, "%g\t%d\n", tau, Nhist );
+    fprintf(fp_out, "%d\t%g\t%d\t%g\n",N, tau, Nhist, t);
     write_histogram(fp_out, vel, N, t/tau);
   }
   while (t < 12*tau) {
