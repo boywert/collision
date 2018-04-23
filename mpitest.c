@@ -211,7 +211,7 @@ int main(int argc, char** argv) {
   FILE *fp_out;
   if(MPI_rank == 0) {
     fp_out = fopen (fp_out_name,"w");
-    fprintf(fp_out, "%d\t%g\t%d\t%g\n",N, tau, Nhist, t);
+    fprintf(fp_out, "%d\t%g\t%g\t%g\t%d\t%g\n",N, tau, vmin,vmax,Nhist, t);
     write_histogram(fp_out, vel, vmin, vmax, N, t/tau);
   }
   while (t < 12*tau) {
