@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <mpi.h>
 #include <math.h>
 #include <gsl/gsl_rng.h>
 #include <gsl/gsl_errno.h>
@@ -9,6 +10,8 @@
 
 #define MIN(a,b) (((a)<(b))?(a):(b))
 #define MAX(a,b) (((a)>(b))?(a):(b))
+
+#define Nhist 16
 double P(double x) {
   return x;
 }
@@ -121,15 +124,50 @@ double *init_vel(int N, int Np, double *rf, double *rx, double xmin, double xmax
 
   return vel;
 }
-
+void write_histogram(FILE *fp, double *vel, int N, double time) {
+  long int_hist[Nhist];
+  for(int i=0; i < Nhist; i++)
+    int_hist[i] = 0;
+  double vmin = -400.0*1e5;
+  double vmax = 400.0*1e5;
+  double dv = (vmax-vmin)/Nhist;
+  for(int i=0; i<N; i++) {
+    if((vel[3*i] > vmin ) && (vel[3*i] < vmax)) {
+      int index = (int)((vel[3*i]-vmin)/dv);
+      int_hist[index]++;
+    }
+  }
+  fprintf(fp,"%g\t",time);
+  for(int k=0; k<Nhist; k++)
+    fprintf(fp,"%g\t",(float)int_hist[k]/N/dv);
+  fprintf(fp,"\n");
+  fflush(fp);
+}
 double KrookWu_f_speed(double v, double K, double beta) {
   return 2.0*M_PI*v*v*exp(-0.5*v*v/(K*beta*beta))/((2.0*M_PI*K*beta*beta)*sqrt(2.0*M_PI*K*beta*beta))*((5.*K-3.)/K + (1.-K)*v*v/(K*K*beta*beta));
 }
 
-int main() {
-  int N = 64;
-  N = N*N*N;
+int main(int argc, char** argv) {
+  MPI_Init(NULL, NULL);
   
+  // Get the number of processes
+  int MPI_nRank;
+  MPI_Comm_size(MPI_COMM_WORLD, &MPI_nRank);
+  
+  // Get the rank of the process
+  int MPI_rank;
+  MPI_Comm_rank(MPI_COMM_WORLD, &MPI_rank);
+
+  int N = 32;
+  N = N*N*N;
+  time_t p_t;
+  struct tm* tm;
+  char Time[23],fp_out_name[256];
+  time(&p_t);
+  tm = localtime(&p_t);
+  strftime(Time, sizeof Time, "%Y:%m:%d-%I:%M:%S", tm);
+  sprintf(fp_out_name,"output_%s",Time);
+
   int Np = 10000;
   double sigma = 187.0*1e5; //cm/s
   double xmin = 0.0;
@@ -155,31 +193,25 @@ int main() {
   //printf("\n");
   double *vel;
   vel = init_vel(N, Np, f, x, xmin, xmax);
-  int Nhist = 16;
-  long int_hist[16] = {0};
-  double vmin = -400.0*1e5;
-  double vmax = 400.0*1e5;
-  double dv = (vmax-vmin)/Nhist;
-  for(int i=0; i<N; i++) {
-    //printf("vx = %g\n",vel[3*i]);
-    if((vel[3*i] > vmin ) && (vel[3*i] < vmax)) {
-      int index = (int)((vel[3*i]-vmin)/dv);
-      //printf("%d\n",index);
-      int_hist[index]++;
-    }
-  }
-  for(int k=0; k<Nhist; k++)
-    printf("%g\t",(float)int_hist[k]/N/dv);
-  printf("\n");
+  MPI_Barrier(MPI_COMM_WORLD);
+  MPI_Bcast(&vel, 3*N, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+
+  
   gsl_rng *rng = gsl_rng_alloc(gsl_rng_taus2);
   gsl_rng_set(rng, time(NULL)); // Seed with time
   double t = 6.0*log(2.5)*tau;
+
   int s_index[N];
   for(int i = 0; i< N; i++)
     s_index[i] = i;
-  
+  FILE *fp_out;
+  if(MPI_rank == 0) {
+    fp_out = fopen (fp_out_name,"w");
+    fprintf(fp_out, "%g\t%d\n", tau, Nhist );
+    write_histogram(fp_out, vel, N, t/tau);
+  }
   while (t < 12*tau) {
-    randomize (s_index, N);
+    //randomize (s_index, N);
     for(int ii=0; ii<N; ii++) {
       int i = s_index[ii];
       for(int jj=ii+1; jj<N; jj++) {
@@ -219,25 +251,11 @@ int main() {
       }
     }
     t+=dt;
-    printf("t = %g\n",t/tau);
-    int Nhist = 16;
-    long int_hist[16] = {0};
-    double vmin = -400.0*1e5;
-    double vmax = 400.0*1e5;
-    double dv = (vmax-vmin)/Nhist;
-    for(int i=0; i<N; i++) {
-      //printf("vx = %g\n",vel[3*i]);
-      if((vel[3*i] > vmin ) && (vel[3*i] < vmax)) {
-	int index = (int)((vel[3*i]-vmin)/dv);
-	//printf("%d\n",index);
-	int_hist[index]++;
-      }
-    }
-    for(int k=0; k<Nhist; k++)
-      printf("%g\t",(float)int_hist[k]/N/dv);
-    printf("\n");
-    fflush(stdout);
+    if(MPI_rank == 0)
+      write_histogram(fp_out, vel, N, t/tau);
+ 
+
   }
-  
+  MPI_Finalize();
   return(0);
 }
