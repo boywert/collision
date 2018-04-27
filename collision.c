@@ -83,11 +83,11 @@ void complex_fftshift(_Complex double *a, int n) {
 
 int main()  {
   int n = 24;
-  double R0 = 600.0;
+  double R0 = 400.0;
   R0 *= UnitVelocity_in_cm_per_s;
   double L = R0*2.5;
   double R = R0*2.0;
-  double sigma = 187.0;
+  double sigma = 187.0/sqrt(3.0);
   sigma *=  UnitVelocity_in_cm_per_s;
   double h_v = 2.*L/n;
   double h_v3 = h_v*h_v*h_v;
@@ -98,7 +98,7 @@ int main()  {
   double V[3] = {0.0, 0.0, 0.0};
   
   double rho = rho_Msun_per_pc3*1.989e33/((3.1e18)*(3.1e18)*(3.1e18)); //g/cm^3
-  double tau = 1./(4*M_PI*rho*C_lambda*UnitVelocity_in_cm_per_s);
+  double tau = 1./(4*M_PI*rho*C_lambda);
   double t = 0;//6.0*log(2.5)*tau;
   double t_max = 15000*Myr;
   double dt = 10*Myr;

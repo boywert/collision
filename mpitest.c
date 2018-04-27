@@ -157,8 +157,11 @@ int main(int argc, char** argv) {
   // Get the rank of the process
   int MPI_rank;
   MPI_Comm_rank(MPI_COMM_WORLD, &MPI_rank);
+  double lambda = 1.0;
   int N;
   sscanf(argv[1],"%d",&N);
+  double dt_per_tau;
+  sscanf(argv[2],"%lf",&dt_per_tau);
   if(MPI_rank == 0)
     printf("DSMC N = %dx%dx%d = %d\n",N,N,N,N*N*N);
   N = N*N*N;
@@ -176,17 +179,21 @@ int main(int argc, char** argv) {
   double xmax = sigma*10;
   double vmin = -400.0*1e5;
   double vmax = 400.0*1e5;
-  double cspm = 1.0*sigma;
+  double cspm = 1.0;
   double rho_Msun_per_pc3 = 0.02;
   double rho = rho_Msun_per_pc3*1.989e33/((3.1e18)*(3.1e18)*(3.1e18)); //g/cm^3
   double Mp = rho/N;
   double kappa = cspm/4.0/M_PI;
   double *x, *f;
+#ifdef VHS
+  double tau = 1/(rho*4.0*M_PI*kappa*sigma);
+#elseif
   double tau = 1/(rho*4.0*M_PI*kappa);
+#endif
 #define Myr (3600*24*365.25*1e6)
   printf("tau = %g Myr\n",tau/Myr);
  
-  double dt = 0.01*tau;
+  double dt = dt_per_tau*tau;
   x = (double *)malloc(sizeof(double)*Np);
   f = (double *)malloc(sizeof(double)*Np);
   for(int i = 0; i < Np; i++) { 
@@ -232,6 +239,9 @@ int main(int argc, char** argv) {
 	rel_v += (v1[2]-v2[2])*(v1[2]-v2[2]);
 	rel_v = sqrt(rel_v);
 	double crosssection = kappa*4.*M_PI;
+#ifdef VHS
+	crosssection *= pow(rel_v,lambda);
+#endif
 	double P = rho/N*crosssection*dt;
 	double finger = gsl_rng_uniform(rng);
 	//printf("P = %g, finger = %g\n",P, finger);
