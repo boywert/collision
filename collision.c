@@ -83,8 +83,9 @@ void complex_fftshift(_Complex double *a, int n) {
   free(b);
 }
 
-int main()  {
-  int n = 32;
+int main(int argc, char** argv)  {
+  int n;
+  sscanf(argv[1],"%d",&n);
   double R0 = 400.0;
   R0 *= UnitVelocity_in_cm_per_s;
   double L = R0*1.0;
