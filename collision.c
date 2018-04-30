@@ -4,11 +4,13 @@
 #include <string.h>
 #include <complex.h>
 #include <fftw3.h>
+#include <time.h>
+#include <unistd.h>
 
-#define lambda 0.0
-//#define lambda 1.0
-#define C_lambda (18700000.0/M_PI/4.0) //cm^2/g cm/s
-//#define C_lambda (1.0/M_PI/4.0) //cm^2/g 
+//#define lambda 0.0
+#define lambda 1.0
+//#define C_lambda (18700000.0/M_PI/4.0) //cm^2/g cm/s
+#define C_lambda (1.0/M_PI/4.0) //cm^2/g 
 #define rho_Msun_per_pc3 0.02   
 #define this_K 0.6
 #define pi M_PI
@@ -82,13 +84,20 @@ void complex_fftshift(_Complex double *a, int n) {
 }
 
 int main()  {
-  int n = 24;
+  int n = 32;
   double R0 = 400.0;
   R0 *= UnitVelocity_in_cm_per_s;
-  double L = R0*2.5;
-  double R = R0*2.0;
+  double L = R0*1.0;
+  double R = R0*1.0;
   double sigma = 187.0/sqrt(3.0);
   sigma *=  UnitVelocity_in_cm_per_s;
+  char Time[64],fp_out_name[256];
+  time_t p_t;
+  struct tm* tm;
+  time(&p_t);
+  tm = localtime(&p_t);
+  strftime(Time, sizeof Time, "%Y%m%d_%I%M%S", tm);
+  sprintf(fp_out_name,"FFT_output_%d_%s",n,Time);
   double h_v = 2.*L/n;
   double h_v3 = h_v*h_v*h_v;
   double h_y = M_PI/L;
@@ -98,10 +107,10 @@ int main()  {
   double V[3] = {0.0, 0.0, 0.0};
   
   double rho = rho_Msun_per_pc3*1.989e33/((3.1e18)*(3.1e18)*(3.1e18)); //g/cm^3
-  double tau = 1./(4*M_PI*rho*C_lambda);
+  double tau = 1./(4*M_PI*rho*C_lambda*sigma);
   double t = 0;//6.0*log(2.5)*tau;
-  double t_max = 15000*Myr;
-  double dt = 10*Myr;
+  double t_max = 10.0*tau;
+  double dt = 0.01*tau;
   double *simpson_third_w;
 
   printf("tau = %g Myr\n",tau/Myr);
@@ -168,7 +177,7 @@ int main()  {
   // Set up g3 for each y in C_y
   FILE *fp_time, *fp_x;
   fp_time = fopen("time.out","w");
-  fp_x = fopen("vx.out","w");
+  fp_x = fopen(fp_out_name,"w");
   for (int i = 0; i < n; i++) {
     double gg = 0.0;
     double gc = 0.0;
@@ -177,10 +186,11 @@ int main()  {
 	gg += dist_fn[i*(n)*(n) + j*(n) + k]*h_v*h_v;
       }
     }
-    printf("%g\t",gg);
+    printf("%g\t",gg/rho);
   }
   printf("\n");
   fflush(fp_x);
+  exit(0);
   while(t < t_max) {
     fftw_complex *g3;
     g3 = fftw_malloc(sizeof(fftw_complex)*(n)*(n)*(n));
@@ -419,7 +429,7 @@ int main()  {
     fftw_free(Q);
     fftw_free(g3);
     free(g);
-    fprintf(fp_time,"%g\n",t/Myr);
+    fprintf(fp_x,"%g\t",t/tau);
     for (int i = 0; i < n; i++) {
       double gg = 0.0;
       double gc = 0.0;
@@ -429,8 +439,8 @@ int main()  {
 	  gc += Q[i*(n)*(n) + j*(n) + k]*h_v*h_v*dt;
 	}
       }
-      fprintf(fp_x,"%g\t",gg);
-      printf("%g\t",gg);
+      fprintf(fp_x,"%g\t",gg/rho);
+      printf("%g\t",gg/rho);
     }
     fprintf(fp_x,"\n");
     printf("\n");

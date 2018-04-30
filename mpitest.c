@@ -149,7 +149,7 @@ double KrookWu_f_speed(double v, double K, double beta) {
 
 int main(int argc, char** argv) {
   MPI_Init(NULL, NULL);
-  
+
   // Get the number of processes
   int MPI_nRank;
   MPI_Comm_size(MPI_COMM_WORLD, &MPI_nRank);
