@@ -190,7 +190,7 @@ int main()  {
   }
   printf("\n");
   fflush(fp_x);
-  exit(0);
+ 
   while(t < t_max) {
     fftw_complex *g3;
     g3 = fftw_malloc(sizeof(fftw_complex)*(n)*(n)*(n));
